@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: agent-sandbox-controller
+    # SandboxManager's readiness gate
+    # (apps/sandbox_manager/agent_sandbox_client.py:validate_agent_sandbox_controller_ready)
+    # compares this label against SANDBOX_AGENT_SANDBOX_CONTROLLER_VERSION and
+    # fails closed on any mismatch, including absent. Upstream's release
+    # manifest does not set it.
+    app.kubernetes.io/version: {{ .Values.image.tag | quote }}
+  name: agent-sandbox-controller
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: agent-sandbox-controller
+  template:
+    metadata:
+      labels:
+        app: agent-sandbox-controller
+    spec:
+      containers:
+      - args:
+        - --leader-elect={{ .Values.leaderElect }}
+        {{- if .Values.extensions }}
+        - --extensions
+        {{- end }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        name: agent-sandbox-controller
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          name: healthz
+          protocol: TCP
+        - containerPort: 9443
+          name: webhook
+          protocol: TCP
+        {{- with .Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        - mountPath: /etc/sandbox-config
+          name: config-volume
+          readOnly: true
+      serviceAccountName: agent-sandbox-controller
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - configMap:
+          name: agent-sandbox-config
+          optional: true
+        name: config-volume
