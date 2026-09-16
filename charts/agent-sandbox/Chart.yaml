@@ -1,0 +1,18 @@
+apiVersion: v2
+name: agent-sandbox
+description: |
+  Kubernetes Agent Sandbox CRDs and controller (kubernetes-sigs/agent-sandbox).
+  Provides the Sandbox, SandboxTemplate, SandboxWarmPool and SandboxClaim
+  primitives that SimbianOS SandboxManager compiles and reconciles against.
+type: application
+# Chart version is independent of the upstream release; bump on chart changes.
+version: 0.1.0
+# Upstream release this chart packages.
+appVersion: v0.5.3
+home: https://github.com/kubernetes-sigs/agent-sandbox
+sources:
+  - https://github.com/kubernetes-sigs/agent-sandbox
+keywords:
+  - sandbox
+  - agent
+  - isolation

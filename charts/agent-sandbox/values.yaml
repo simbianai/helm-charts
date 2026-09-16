@@ -1,0 +1,35 @@
+# Namespace the controller runs in. SandboxManager must be configured with the
+# same value via SANDBOX_AGENT_SANDBOX_CONTROLLER_NAMESPACE.
+namespace: agent-sandbox-system
+createNamespace: true
+
+image:
+  repository: registry.k8s.io/agent-sandbox/agent-sandbox-controller
+  # Must match SANDBOX_AGENT_SANDBOX_CONTROLLER_VERSION on the SandboxManager
+  # side: the tag is stamped onto the Deployment's app.kubernetes.io/version
+  # label, which SandboxManager's readiness gate compares against and fails
+  # closed on mismatch.
+  tag: v0.5.3
+  pullPolicy: IfNotPresent
+
+# Enables SandboxTemplate / SandboxWarmPool / SandboxClaim. Required by
+# SandboxManager's pooled allocation modes (shared, tenant-dedicated).
+extensions: true
+
+leaderElect: true
+replicas: 1
+
+# Upstream ships no resource block. These are conservative starting values for
+# a controller-runtime manager; tune once real usage is observed.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# The controller is cluster-scoped control plane, not a sandbox workload -- it
+# does not need to run on the sandbox node pool.
+nodeSelector: {}
+tolerations: []
