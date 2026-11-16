@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "trivy-server.fullname" . }}
+  labels:
+    {{- include "trivy-server.labels" . | nindent 4 }}
+spec:
+  # Single replica: each replica would keep its own DB cache on its own PVC.
+  replicas: 1
+  serviceName: {{ include "trivy-server.fullname" . }}
+  selector:
+    matchLabels:
+      {{- include "trivy-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "trivy-server.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "trivy-server.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: trivy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          args:
+            - server
+            - --listen
+            - 0.0.0.0:{{ .Values.service.port }}
+            - --cache-dir
+            - /home/scanner/.cache/trivy
+            {{- if .Values.trivy.dbRepository }}
+            - --db-repository
+            - {{ .Values.trivy.dbRepository | quote }}
+            {{- end }}
+            {{- if .Values.trivy.javaDbRepository }}
+            - --java-db-repository
+            - {{ .Values.trivy.javaDbRepository | quote }}
+            {{- end }}
+            {{- range .Values.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          env:
+            - name: TRIVY_DEBUG
+              value: {{ .Values.trivy.debug | quote }}
+            - name: TRIVY_SKIP_DB_UPDATE
+              value: {{ .Values.trivy.skipDbUpdate | quote }}
+            - name: TRIVY_SKIP_JAVA_DB_UPDATE
+              value: {{ .Values.trivy.skipJavaDbUpdate | quote }}
+            {{- if .Values.token.existingSecret }}
+            - name: TRIVY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.token.existingSecret }}
+                  key: {{ .Values.token.key }}
+            {{- end }}
+            {{- if .Values.registryAuth.existingSecret }}
+            - name: TRIVY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registryAuth.existingSecret }}
+                  key: {{ .Values.registryAuth.usernameKey }}
+            - name: TRIVY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registryAuth.existingSecret }}
+                  key: {{ .Values.registryAuth.passwordKey }}
+            {{- end }}
+            {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          # The first start downloads the DB; allow plenty of time.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: cache
+              mountPath: /home/scanner/.cache/trivy
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if not .Values.persistence.enabled }}
+        - name: cache
+          emptyDir: {}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: cache
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

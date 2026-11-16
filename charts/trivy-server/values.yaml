@@ -1,0 +1,93 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/aquasecurity/trivy
+  # Defaults to Chart.appVersion
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 4954
+  annotations: {}
+
+trivy:
+  debug: false
+  # Where the server pulls the vulnerability DB from. Override to point at an
+  # internal OCI mirror if the cluster cannot reach ghcr.io.
+  dbRepository: ""
+  javaDbRepository: ""
+  # Set true only when the DB is pre-seeded into the cache volume.
+  skipDbUpdate: false
+  skipJavaDbUpdate: false
+
+# Optional shared secret. If set, clients must send the same value
+# (trivy image --server URL --token ...). Secret must already exist.
+token:
+  existingSecret: ""
+  key: token
+
+# Optional credentials for a private DB mirror registry (existing Secret).
+registryAuth:
+  existingSecret: ""
+  usernameKey: username
+  passwordKey: password
+
+# Extra env vars (e.g. HTTP_PROXY) as a map, and extra CLI args as a list.
+env: {}
+extraArgs: []
+
+persistence:
+  enabled: true
+  storageClass: ""
+  size: 5Gi
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 2Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Restrict who may reach the server. Needs a CNI that enforces NetworkPolicy.
+networkPolicy:
+  enabled: false
+  allowedFrom: []
+  # - namespaceSelector:
+  #     matchLabels:
+  #       kubernetes.io/metadata.name: actions-runner-system
+
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    interval: 60s
+    labels: {}
