@@ -1,0 +1,11 @@
+apiVersion: v2
+name: trivy-server
+description: Trivy in server mode. Keeps a persistent vulnerability DB cache so CI scanners (e.g. GitHub Actions runners) don't each download it.
+type: application
+version: 0.1.0
+appVersion: 0.58.1
+home: https://trivy.dev
+sources:
+  - https://github.com/aquasecurity/trivy
+maintainers:
+  - name: simbian-devops
